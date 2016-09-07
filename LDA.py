@@ -7,41 +7,58 @@ from collections import defaultdict
 
 class LDA(object):
 
-	def __init__(self, topics=3, docs="data/docs", stopwords="data/stopwords.txt"):
-		self.topics = topics-1
+	def __init__(self, topics=4, docs="data/docs", stopwords="data/stopwords.txt"):
+		self.topics = topics
 
 		# Get a full list of stopwords
 		with open(stopwords, 'r') as stopwords:
 			self.stopwords = stopwords.read().split()
 			self.stopwords = set(self.stopwords).union(set(nltk_stopwords.words('english')))
 
-		# Build vocabulary set
+		""" ------------------------------------------------ """
+
+		# BUILD VOCABULARY SET: remove stop words and make vocabulary sets and document lists
 		self.documents  = list()
 		self.vocabulary = set()
 
-		union = self.vocabulary.union
+		append = self.documents.append
+		stem   = PorterStemmer().stem
+		sub    = re.compile(r"\W+").sub
+
 		for doc in os.listdir(docs):
 
 			with open("{}/{}".format(docs, doc), 'r') as document:
-				doc = [re.sub(r"\W+","",w) for w in document.read().lower().split() if w not in self.stopwords and len(w) < 20]
-				doc = [PorterStemmer().stem(w) for w in doc]
+				doc = (sub("", w) for w in document.read().lower().split() if w not in self.stopwords and len(w) < 20)
+				doc = [stem(w) for w in doc]
 				self.vocabulary = self.vocabulary.union(set(doc))
 
 			if len(doc) > 0:
-				self.documents.append(doc)
+				append(doc)
 
-		self.documents_num 	= list()
-		self.vocabulary = list(self.vocabulary)
+		""" ------------------------------------------------ """
 
 		# Replace words in docs with associated vocabulary index
+		self.documents_num 	= list()
+		self.vocabulary = list(self.vocabulary)
+		append_num = self.documents_num.append
+
+		# Loop through the documents in document set
 		for doc in self.documents:
+			doc_num = list()
+			append_doc_num = doc_num.append
 
-			for i, pv in enumerate(self.vocabulary):
-				doc = [i if pv==w else w for w in doc]
+			# Convert each word into its corresponding index in the vocabulary
+			for w in doc:
 
-			self.documents_num.append(doc)
+				for i, pv in enumerate(self.vocabulary):
 
+					if pv==w:
+						append_doc_num(i)
 
+			append_num(doc_num)
+
+		""" ------------------------------------------------ """
+		"""
 		# ASSIGN VOCABULARY TO TOPICS
 		self.topic_distribution = defaultdict(list)
 
@@ -57,14 +74,44 @@ class LDA(object):
 			#print topic_number, len(topic_list), len(topic_set)
 			for t in topic_list:
 				print topic_number, self.tfidf(t)
+		"""
 
-			#for document in self.documents_num:
+		#print self.vocabulary
+		print [len(d) for d in self.documents_num]
+		print self.documents
 
-			#	print topic_number, [(t,self.tfidf(t)) for t in topic_set]
+		""" ------------------------------------------------ """
 
-			#topic_set = set(topic)
-			#print topic_set
+		self.documents_by_topic = list()
+		append = self.documents_by_topic.append
 
+		# Assign topics to words in each document
+		for doc in self.documents_num:
+			append(self.assign_topics(doc))
+
+		print self.documents_by_topic
+
+		for d in self.documents_by_topic:
+			for t in set(d):
+				print t, d.count(t)/(1.*len(d))
+
+
+		#for document in self.documents_by_topic:
+		#	for topic in xrange(topics):
+		#		print "Topic: {}\tPercentage: {}".format(topic, document.count(topic)/(1.*len(document)))
+
+		#for i in xrange(len(self.vocabulary)):
+		#	print self.documents_num[0].count(i)/(1.*len(self.documents_num[0]))
+
+	def assign_topics(self, doc):
+		new_document = list()
+		assign_topic = new_document.append
+
+		for w in doc:
+			topic = random.sample(xrange(self.topics), 1)[0]
+			assign_topic(topic)
+
+		return new_document
 
 	def term_frequency(self, word):
 		try:
@@ -91,73 +138,15 @@ class LDA(object):
 		#print word, df, tf
 		return [t*df for t in tf]
 
-		#print os.listdir(docs)
-		#print len(self.documents_num), self.documents_num
-		#print self.documents
-		#print vocabulary
-
-	"""
-	def split_topics(self):
-		topic_list = [list() for topic in xrange(self.topics)]
-
-		for doc in self.documents:
-			for w in doc:
-				random_index = int(round(random.random()*(self.topics-1)))
-				topic_list[random_index].append(w.lower())
-
-		#print len(topic_list), len(topic_list[0]), len(topic_list[1]), len(topic_list[2])
-		return topic_list
-
-	def term_frequency(self, word):
-		return [doc.count(word)/self.doc_lens[i] for i,doc in enumerate(self.documents)]
-
-	def inverse_document_frequency(self, word):
-		occurrence = sum(1. if word in doc else 0. for doc in self.documents)
-		return math.log((self.documents_size/occurrence))
-
-	def tf(self):
-
-		frequencies = list()
-
-		for doc in self.documents:
-
-			doc_n = len(doc)*1.
-			doc_tf = dict()
-
-			for w in set(doc):
-				doc_tf[w] = doc.count(w)/doc_n
-			frequencies.append(doc_tf)
-
-		return frequencies
-
-	def idf(self):
-		import math
-		topics = self.split_topics()
-		docs_n = len(self.documents)*1.
-		terms = set((term for topic in topics for term in topic))
-
-		frequencies = dict()
-
-		for term in list(terms)[:20]:
-			doc_freq = sum((1 for doc in self.documents if term in doc))
-			frequencies[term] = math.log(docs_n/doc_freq)
-
-		return frequencies
-
-	def tfidf(self):
-		tf = self.tf(); idf=self.idf()
-		print len(tf), len(idf), len(tf[0]), idf
-
-	def freq(self):
-		pass
-	"""
 
 if __name__ == '__main__':
 	l = LDA()
 	#print l.term_frequency("read"), l.term_frequency("eat"), l.tfidf("like")
 	#print l.document_frequency("eat")
-	print l.tfidf("read"); print l.tfidf("eat"); print l.tfidf("like")
+	#print l.tfidf("read"); print l.tfidf("eat"); print l.tfidf("like")
 	#l.split_topics(); 
 	#l.tfidf()
 	#tf = l.term_frequency("mga"); idf = l.inverse_document_frequency("mga")
 	#print [t/idf for t in tf]
+
+	#print "SAMPLE", random.sample(xrange(3),1)
